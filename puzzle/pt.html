@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>拼图</title>
+		<style type="text/css">
+			.gameDiv {
+				width : 800px;
+				height : 800px;
+				border : 1px solid black;
+				margin : 10px auto;
+			}
+			.slice {
+				width : 199px;
+				height : 199px;
+				margin : 1px 1px 0 0;
+				float : left;
+				font-size : 50px;
+				text-align : center;
+				line-height : 199px;
+				color : yellow;
+				font-weight : bold;
+			}
+			#mask {
+				width : 199px;
+				height : 199px;
+				background : gray;
+				opacity : 0.5;
+				position : absolute;
+				display : none;
+			}
+		</style>
+		<script type="text/javascript">
+			window.onload = function (){
+				// 获取遮罩div
+				var mask = document.getElementById('mask');
+				// 获取容器div
+				var gameDiv = document.getElementById('gameDiv');
+				var slices = gameDiv.getElementsByTagName('div');
+				
+				// 用两个循环生成背景
+				for(var i = 0; i < 4; i++){ // 循环每一行div
+					for(var j = 0; j < 4; j++){ // 循环每一行中的每一列div
+						slices[i*4 + j].style.background = "url(2.jpg) " + (-j*199) + "px " + (-i*199) + "px";
+					}
+				}
+				
+				// 将所有的div放到一个数组当中，顺便编个号
+				// 数组主要用于打乱这些div
+				var divs = [];
+				for(var i = 0; i < slices.length; i++){
+					divs.push(slices[i]);
+				}
+				// 打乱所有的div
+				divs.sort(function(){
+					return Math.random() - 0.5;
+				});
+				// 将所有的div按打乱的顺序重新放到父级gameDiv中
+				for(var i = 0; i < divs.length; i++){
+					gameDiv.appendChild(divs[i]);
+				}
+				
+				slices = divs;
+				// 维护一个坐标数组，用于存放每一个div块的原先的位置
+				var pos = [];
+				for(var i = 0; i < slices.length; i++){
+					// 记录打乱之后的div的index（第几个）
+					slices[i].index = i;
+					// 记录div块最原始的位置
+					pos.push({left:slices[i].offsetLeft, top:slices[i].offsetTop});
+					// 做布局转换
+					// 1. 设置left、top
+					slices[i].style.left = slices[i].offsetLeft + "px";
+					slices[i].style.top = slices[i].offsetTop + "px";
+				}
+				
+				// 2. 加定位、去margin
+				for(var i = 0; i < slices.length; i++){
+					slices[i].style.position = "absolute";
+					slices[i].style.margin = "0";
+					drag(slices[i]);
+				}
+				
+				
+				// 拖拽函数
+				var zIndex = 1; // 2^31
+				function drag(dom){
+					dom.onmousedown = function (e){
+						var evt = e || window.event;
+						var l = evt.offsetX;
+						var t = evt.offsetY;
+						// 层级一次加二
+						zIndex += 2
+						// 让dom的层级一次性提高两级
+						dom.style.zIndex = zIndex;
+						// 遮罩一次提高一级
+						mask.style.zIndex = zIndex - 1;
+						var nearestDiv = null;
+						
+						document.onmousemove = function (e){
+							var evt = e || window.event;
+							
+							var toLeft = evt.clientX - l;
+							var toTop = evt.clientY - t;
+							
+							dom.style.left = toLeft + "px";
+							dom.style.top = toTop + "px";
+							
+							// 找到碰到的块中的最近的那一个
+							nearestDiv = findNearest(dom);
+							if(nearestDiv){
+								mask.style.display = "block";
+								mask.style.left = nearestDiv.offsetLeft + 'px';
+								mask.style.top = nearestDiv.offsetTop + 'px';
+							}
+							
+						}
+						document.onmouseup = function (){
+							document.onmousemove = null;
+							document.onmouseup = null;
+							if(nearestDiv){
+								// 鼠标抬起的时候交换两个div块(dom, nearestDiv)的位置
+								dom.style.left = pos[nearestDiv.index].left + "px";
+								dom.style.top = pos[nearestDiv.index].top + "px";
+								nearestDiv.style.left = pos[dom.index].left + "px";
+								nearestDiv.style.top = pos[dom.index].top + "px";
+								// 交换两个dom的index
+								var temp = dom.index;
+								dom.index = nearestDiv.index;
+								nearestDiv.index = temp;
+								// 隐藏遮罩
+								mask.style.display = "none";
+							} else {
+								dom.style.left = pos[dom.index].left + "px";
+								dom.style.top = pos[dom.index].top + "px";
+							}
+							
+						}
+						return false;
+					}
+				}
+				
+				// 封装一个函数，用于寻找最近的碰撞块
+				// 附带看看是不是有div和拖拽的块碰上
+				function findNearest(dom){
+					var min = 999999;
+					var index = -1;
+					// 用一个循环检测所有的块和移动的块有没有碰上
+					for(var i = 0; i < slices.length; i++){
+						//slices[i].style.background = "red";
+						// 如果是同一个div块，那么继续执行下一次循环
+						// 跳过碰撞检测
+						if(slices[i] == dom){ 
+							continue;
+						}
+						if(detectKnock(dom, slices[i])){
+							// 计算两者之间的距离，
+							var distance = calcDistance(dom, slices[i]);
+							// 记录下离拖动的div最近的那个div的下标
+							if(distance < min){
+								min = distance;
+								index = i;
+							}
+						}
+					}
+					
+					if(index != -1){ // 有碰上的div的话，返回最近的那个
+						return slices[index];
+					} else {
+						return null;
+					}
+				}
+				
+				// 封装一个函数，用于计算两个dom块之间的距离
+				function calcDistance(dom1, dom2){
+					// 第一个dom块中心点的left和top
+					var centerLeft1 = dom1.offsetLeft + dom1.offsetWidth / 2;
+					var centerTop1 = dom1.offsetTop + dom1.offsetHeight / 2;
+					
+					// 第二个dom块中心点的left和top
+					var centerLeft2 = dom2.offsetLeft + dom2.offsetWidth / 2;
+					var centerTop2 = dom2.offsetTop + dom2.offsetHeight / 2;
+					
+					// 算两点之间的距离c^2 = a^2 + b^2
+					var a = centerTop2 - centerTop1;
+					var b = centerLeft2 - centerLeft1;
+					
+					var dis = Math.sqrt(a*a + b*b);
+					return dis;
+				}
+				
+				// 碰撞检测函数
+				function detectKnock(dom1, dom2){
+					// 第一个dom的四条边线的位置
+					var l1 = dom1.offsetLeft;
+					var t1 = dom1.offsetTop;
+					var r1 = l1 + dom1.offsetWidth;
+					var b1 = t1 + dom1.offsetHeight;
+					
+					// 第二个dom的四条边线的位置
+					var l2 = dom2.offsetLeft;
+					var t2 = dom2.offsetTop;
+					var r2 = l2 + dom2.offsetWidth;
+					var b2 = t2 + dom2.offsetHeight;
+					
+					if(l1 > r2 || t1 > b2 || r1 < l2 || b1 < t2){
+						return false;
+					}
+					return true;
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<div id="gameDiv" class="gameDiv">
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+			<div class="slice"></div>
+		</div>
+		<div id="mask"></div>
+	</body>
+</html>
