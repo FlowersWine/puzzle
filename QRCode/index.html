@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title></title>
+	</head>
+	<body>
+		<input type="text" id="inp"  />
+		<input type="button" id="btn" value="生成" />
+		<br /><img src="" id="myQR"/>
+		<script type="text/javascript">
+			window.onload = function (){
+				var inp = document.getElementById('inp');
+				var btn = document.getElementById('btn');
+				btn.onclick = function (){
+					var data = inp.value;
+					
+					var img = document.getElementById('myQR');
+					img.src = "http://api.k780.com:88/?app=qr.get&data=" + data + "&level=L&size=6";
+					
+				}
+				
+				
+			}
+		</script>
+		
+	</body>
+</html>
